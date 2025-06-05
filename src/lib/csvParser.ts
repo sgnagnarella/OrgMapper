@@ -1,3 +1,4 @@
+
 // A very basic CSV parser.
 // Limitations: Does not handle commas or newlines within quoted fields correctly.
 // For production, consider a more robust library if complex CSVs are expected.
@@ -7,9 +8,13 @@ export function parseCSV(csvText: string): { headers: string[]; rows: Record<str
   if (lines.length === 0) return { headers: [], rows: [] };
 
   // Basic CSV header parsing: split by comma, trim whitespace, remove surrounding quotes
-  const parseHeader = (headerLine: string) => 
-    headerLine.split(',').map(h => h.trim().replace(/^"|"$/g, ''));
-  
+  // Assign a placeholder if a header is empty.
+  const parseHeader = (headerLine: string) =>
+    headerLine.split(',').map((h, index) => {
+      const trimmedHeader = h.trim().replace(/^"|"$/g, '');
+      return trimmedHeader === '' ? `(Unnamed Column ${index + 1})` : trimmedHeader;
+    });
+
   const headers = parseHeader(lines[0]);
   const rows: Record<string, string>[] = [];
 
@@ -18,10 +23,10 @@ export function parseCSV(csvText: string): { headers: string[]; rows: Record<str
 
     // Basic CSV row parsing (same limitations as header)
     // This regex attempts to handle quoted fields with commas but is not fully robust.
-    const values = lines[i].split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/).map(v => 
+    const values = lines[i].split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/).map(v =>
       v.trim().replace(/^"|"$/g, '')
     );
-    
+
     if (values.length === headers.length) {
       const row = headers.reduce((obj, header, index) => {
         obj[header] = values[index] !== undefined ? values[index] : "";
