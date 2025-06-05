@@ -42,12 +42,12 @@ export function FilterControls({ options, activeFilters, onFilterChange, onReset
         disabled={disabled || !incomingFilterOptions || incomingFilterOptions.length === 0}
       >
         <SelectTrigger id={`filter-${id}`} className="w-full">
-          <SelectValue placeholder={`Filter by ${label.toLowerCase()}...`} />
+          <SelectValue placeholder={`All ${label}s`} />
         </SelectTrigger>
         <SelectContent>
-          <SelectItem value="">All {label}s</SelectItem>
+          <SelectItem value="all">All {label}s</SelectItem>
           {/* Ensure options are robustly filtered for non-empty strings before mapping */}
-          {(incomingFilterOptions || []) // Handle case where incomingFilterOptions might be undefined/null
+          {(incomingFilterOptions || [])
             .filter(option => typeof option === 'string' && option !== '') // Ensure it's a non-empty string
             .map((option, index) => (
               <SelectItem key={`${id}-${option}-${index}`} value={option}>
@@ -61,7 +61,7 @@ export function FilterControls({ options, activeFilters, onFilterChange, onReset
 
   return (
     <div className="space-y-4">
-      {filterConfig.map(fc => {
+      {filterConfig.map((fc) => {
          const currentOptions = options[fc.id === 'teamProject' ? 'teamProjects' : fc.id === 'employeeType' ? 'employeeTypes' : 'levels'];
          return renderSelect(fc.id, fc.label, fc.icon, currentOptions || []);
       })}
