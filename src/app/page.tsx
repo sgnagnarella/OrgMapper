@@ -1,3 +1,9 @@
+import OrgMapperPage from '@/components/OrgMapperPage';
+
 export default function Home() {
-  return <></>;
+  return (
+    <main className="flex-grow">
+      <OrgMapperPage />
+    </main>
+  );
 }
