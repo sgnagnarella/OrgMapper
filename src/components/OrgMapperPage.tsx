@@ -25,6 +25,10 @@ const initialActiveFilters: ActiveFilters = {
   clickedLocation: null,
 };
 
+const createUniqueSortedOptions = (values: (string | undefined | null)[]): string[] => {
+  return [...new Set(values.map(v => v?.trim() || '').filter(v => v !== ''))].sort();
+};
+
 export default function OrgMapperPage() {
   const [file, setFile] = useState<File | null>(null);
   const [csvHeaders, setCsvHeaders] = useState<string[]>([]);
@@ -134,9 +138,9 @@ export default function OrgMapperPage() {
       setProcessedEmployees(mappedEmployees);
 
       // Derive filter options
-      const levels = [...new Set(mappedEmployees.map(e => e.level).filter(Boolean))].sort();
-      const employeeTypes = [...new Set(mappedEmployees.map(e => e.employeeType).filter(Boolean))].sort();
-      const teamProjects = [...new Set(mappedEmployees.map(e => e.teamProject).filter(Boolean))].sort();
+      const levels = createUniqueSortedOptions(mappedEmployees.map(e => e.level));
+      const employeeTypes = createUniqueSortedOptions(mappedEmployees.map(e => e.employeeType));
+      const teamProjects = createUniqueSortedOptions(mappedEmployees.map(e => e.teamProject));
       setFilterOptions({ levels, employeeTypes, teamProjects });
       
       toast({ title: "Mappings Applied", description: `${mappedEmployees.length} records processed.` });
