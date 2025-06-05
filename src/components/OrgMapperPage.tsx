@@ -91,13 +91,12 @@ export default function OrgMapperPage() {
       const newMappings = { ...initialColumnMappings };
       let mappedCount = 0;
       (Object.keys(result.columnMapping) as Array<keyof typeof result.columnMapping>).forEach(key => {
-        const targetKey = key as TargetField; // Ensure key is a TargetField
+        const targetKey = key as TargetField; 
         const csvHeaderFound = result.columnMapping[key];
-        if (csvHeaders.includes(csvHeaderFound)) {
+        if (csvHeaderFound && csvHeaders.includes(csvHeaderFound)) {
           newMappings[targetKey] = csvHeaderFound;
           mappedCount++;
         } else {
-          // AI suggested a column not in CSV headers, or empty string
           newMappings[targetKey] = null;
         }
       });
@@ -106,14 +105,14 @@ export default function OrgMapperPage() {
     } catch (e: any) {
       setError(`AI mapping error: ${e.message}`);
       toast({ variant: "destructive", title: "AI Mapping Error", description: e.message });
-      setColumnMappings(initialColumnMappings); // Reset to manual if AI fails
+      setColumnMappings(initialColumnMappings); 
     } finally {
       setIsMappingAi(false);
     }
   }, [csvHeaders, toast]);
 
   useEffect(() => {
-    if (csvHeaders.length > 0 && !file?.name.endsWith("_mapped.csv")) { // Avoid re-running AI if it's a re-upload of a "mapped" file.
+    if (csvHeaders.length > 0 && !file?.name.endsWith("_mapped.csv")) { 
         handleAiMapColumns();
     }
   }, [csvHeaders, handleAiMapColumns, file]);
@@ -137,7 +136,6 @@ export default function OrgMapperPage() {
 
       setProcessedEmployees(mappedEmployees);
 
-      // Derive filter options
       const levels = createUniqueSortedOptions(mappedEmployees.map(e => e.level));
       const employeeTypes = createUniqueSortedOptions(mappedEmployees.map(e => e.employeeType));
       const teamProjects = createUniqueSortedOptions(mappedEmployees.map(e => e.teamProject));
@@ -156,7 +154,6 @@ export default function OrgMapperPage() {
     return TARGET_FIELDS.every(field => columnMappings[field] !== null);
   }, [columnMappings]);
 
-  // Filter employees based on activeFilters
   useEffect(() => {
     let newFilteredEmployees = processedEmployees;
 
@@ -174,40 +171,49 @@ export default function OrgMapperPage() {
     setFilteredEmployees(newFilteredEmployees);
   }, [processedEmployees, activeFilters]);
 
-  // Generate treemap data from filteredEmployees
   useEffect(() => {
-    if (filteredEmployees.length === 0 && processedEmployees.length > 0) { // If filters result in no data, show empty chart
+    if (filteredEmployees.length === 0 && processedEmployees.length > 0) { 
         setTreemapData([]);
         return;
     }
     if (filteredEmployees.length === 0) return;
 
-
     const managersMap = new Map<string, Map<string, number>>(); 
 
     filteredEmployees.forEach(emp => {
-      if (!emp.manager || !emp.location) return;
+      const managerName = emp.manager?.trim();
+      // If location is empty or whitespace, use a placeholder. Manager must exist.
+      const locationName = emp.location?.trim() || '(Unknown Location)'; 
 
-      const managerLocations = managersMap.get(emp.manager) || new Map<string, number>();
-      const currentLocationCount = managerLocations.get(emp.location) || 0;
-      managerLocations.set(emp.location, currentLocationCount + 1);
-      managersMap.set(emp.manager, managerLocations);
+      if (!managerName) { // Manager is absolutely essential for the treemap structure
+        // Optionally log if employees are skipped due to missing manager
+        // console.warn(`Skipping employee for treemap due to missing manager:`, emp.originalRow?.['User Name'] || emp.id);
+        return;
+      }
+
+      const managerLocations = managersMap.get(managerName) || new Map<string, number>();
+      const currentLocationCount = managerLocations.get(locationName) || 0;
+      managerLocations.set(locationName, currentLocationCount + 1);
+      managersMap.set(managerName, managerLocations);
     });
 
     const newTreemapData: TreemapNode[] = [];
     managersMap.forEach((locations, managerName) => {
       const locationChildren: TreemapNode[] = [];
       let managerTotalEmployees = 0;
-      locations.forEach((count, locationName) => {
+      locations.forEach((count, locName) => {
         locationChildren.push({
-          name: locationName,
+          name: locName,
           value: count,
           type: 'location',
-          path: `${managerName}/${locationName}`,
+          path: `${managerName}/${locName}`,
         });
         managerTotalEmployees += count;
       });
-      if (locationChildren.length > 0) { // Only add manager if they have locations with employees after filtering
+      
+      // Only add manager if they have location children (which they will if they had reports,
+      // possibly under Unknown Location)
+      if (locationChildren.length > 0) { 
         newTreemapData.push({
           name: managerName,
           children: locationChildren,
@@ -218,13 +224,12 @@ export default function OrgMapperPage() {
       }
     });
     setTreemapData(newTreemapData);
-  }, [filteredEmployees, processedEmployees]); // Add processedEmployees to re-evaluate when it changes (e.g. new CSV)
+  }, [filteredEmployees, processedEmployees]); 
   
   const handleFilterChange = useCallback((filterName: keyof Pick<ActiveFilters, 'level' | 'employeeType' | 'teamProject'>, value: string | null) => {
     setActiveFilters(prev => ({ 
         ...prev, 
         [filterName]: value,
-        // Reset node click filters if regular filters are changed
         clickedManager: null, 
         clickedLocation: null,
     }));
@@ -238,7 +243,7 @@ export default function OrgMapperPage() {
   const handleNodeClick = useCallback((node: TreemapNode) => {
     if (node.type === 'manager') {
       setActiveFilters(prev => ({
-        ...prev, // Keep existing dropdown filters
+        ...prev, 
         level: prev.level,
         employeeType: prev.employeeType,
         teamProject: prev.teamProject,
@@ -249,7 +254,7 @@ export default function OrgMapperPage() {
     } else if (node.type === 'location') {
       const [managerName] = node.path.split('/');
       setActiveFilters(prev => ({
-        ...prev, // Keep existing dropdown filters
+        ...prev, 
         level: prev.level,
         employeeType: prev.employeeType,
         teamProject: prev.teamProject,
@@ -278,7 +283,7 @@ export default function OrgMapperPage() {
             <ColumnSelector
               key={field}
               fieldId={`map-${field}`}
-              label={field.charAt(0).toUpperCase() + field.slice(1).replace(/([A-Z])/g, ' $1')} // Camel case to Title Case
+              label={field.charAt(0).toUpperCase() + field.slice(1).replace(/([A-Z])/g, ' $1')} 
               options={csvHeaders}
               selectedValue={columnMappings[field]}
               onChange={(value) => handleMappingChange(field, value)}
@@ -329,7 +334,6 @@ export default function OrgMapperPage() {
       )}
 
       <div className="flex flex-col lg:flex-row gap-6">
-        {/* Controls Panel */}
         <div className="lg:w-1/3 space-y-6">
           {sections.map(section => section.show && (
             <Card key={section.title} className="shadow-md">
@@ -347,9 +351,8 @@ export default function OrgMapperPage() {
           ))}
         </div>
 
-        {/* Treemap Panel */}
         <div className="lg:w-2/3">
-          <Card className="shadow-md h-[calc(100vh-12rem)] min-h-[400px] lg:h-full"> {/* Adjust height as needed */}
+          <Card className="shadow-md h-[calc(100vh-12rem)] min-h-[400px] lg:h-full">
             <CardHeader>
               <CardTitle className="flex items-center text-xl font-headline">
                 <BarChart2 className="h-5 w-5 text-primary" />
@@ -361,7 +364,7 @@ export default function OrgMapperPage() {
                   : "Overview of managers and their locations by employee count."}
               </CardDescription>
             </CardHeader>
-            <CardContent className="h-[calc(100%-8rem)]"> {/* Adjust based on CardHeader height */}
+            <CardContent className="h-[calc(100%-8rem)]">
               {(isParsing || isProcessingData) && !treemapData.length ? (
                   <div className="flex flex-col items-center justify-center h-full">
                     <Loader2 className="h-12 w-12 animate-spin text-primary mb-4" />
