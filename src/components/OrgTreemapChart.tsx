@@ -14,9 +14,9 @@ interface RechartsNodeProps {
   width: number;
   height: number;
   index: number;
-  payload: AppTreemapNode; // The node data passed to Recharts
-  name: string; // Automatically passed by Recharts based on dataKey and payload
-  value: number; // Automatically passed by Recharts
+  payload?: AppTreemapNode; // Make payload optional as it might be undefined
+  name?: string;
+  value?: number;
   children?: AppTreemapNode[];
   root?: AppTreemapNode;
   [key: string]: any;
@@ -42,10 +42,13 @@ interface CustomizedContentProps extends RechartsNodeProps {
 const CustomizedContent: React.FC<CustomizedContentProps> = ({
   depth, x, y, width, height, index, payload, name, value, onNodeClick, colorsInfo
 }) => {
+  if (!payload || !name) { // Add guard for payload and name
+    return null;
+  }
+
   const handleClick = useCallback(() => {
-    if (payload) {
-      onNodeClick(payload);
-    }
+    // payload is guaranteed to exist here due to the check above
+    onNodeClick(payload);
   }, [payload, onNodeClick]);
 
   const isManagerNode = payload.type === 'manager';
@@ -65,7 +68,7 @@ const CustomizedContent: React.FC<CustomizedContentProps> = ({
     (!isManagerNode && width > 60 && height > 20 && width * height > 500)
   );
 
-  const showValue = canShowAnyText && (
+  const showValue = canShowAnyText && value !== undefined && ( // Ensure value is defined
     (isManagerNode && width > 70 && height > 25 && width * height > 1500) || 
     (!isManagerNode && width > 80 && height > 40 && width * height > 1000)
   );
@@ -78,8 +81,8 @@ const CustomizedContent: React.FC<CustomizedContentProps> = ({
   let valueYPosition = y + height / 2;
 
   if (showName && showValue) {
-    nameYPosition = y + height / 2 - nameFontSize * 0.55; // Adjusted for better spacing
-    valueYPosition = y + height / 2 + valueFontSize * 0.75; // Adjusted for better spacing
+    nameYPosition = y + height / 2 - nameFontSize * 0.55; 
+    valueYPosition = y + height / 2 + valueFontSize * 0.75; 
   } else if (showName && !showValue) {
     nameYPosition = y + height / 2;
   } else if (!showName && showValue) {
@@ -96,7 +99,7 @@ const CustomizedContent: React.FC<CustomizedContentProps> = ({
         style={{
           fill: fillColor,
           stroke: '#fff',
-          strokeWidth: 2 / (depth + 1e-10), // Smaller stroke for deeper levels
+          strokeWidth: 2 / (depth + 1e-10), 
           strokeOpacity: 1 / (depth + 1e-10),
           cursor: 'pointer',
         }}
@@ -115,7 +118,7 @@ const CustomizedContent: React.FC<CustomizedContentProps> = ({
           {name}
         </text>
       )}
-      {showValue && (
+      {showValue && value !== undefined && ( 
          <text
           x={x + width / 2}
           y={valueYPosition}
@@ -141,7 +144,6 @@ export function OrgTreemapChart({ data, onNodeClick }: OrgTreemapChartProps) {
     return <div className="flex items-center justify-center h-full text-muted-foreground">No data to display. Try adjusting filters or uploading a new CSV.</div>;
   }
   
-  // Default props for CustomizedContent, Recharts requires them if you pass a component to `content`
   const contentRenderer = (props: RechartsNodeProps) => (
     <CustomizedContent {...props} onNodeClick={onNodeClick} colorsInfo={TREEMAP_COLORS_INFO} />
   );
@@ -150,9 +152,9 @@ export function OrgTreemapChart({ data, onNodeClick }: OrgTreemapChartProps) {
     <ResponsiveContainer width="100%" height="100%">
       <Treemap
         data={data}
-        dataKey="value" // Key for the size of the cell
-        ratio={4 / 3}    // Aspect ratio of cells
-        stroke="#fff"    // Border color for cells
+        dataKey="value" 
+        ratio={4 / 3}    
+        stroke="#fff"    
         content={contentRenderer}
         isAnimationActive={true}
         animationDuration={500}
@@ -165,9 +167,13 @@ export function OrgTreemapChart({ data, onNodeClick }: OrgTreemapChartProps) {
 }
 
 
-const CustomTooltip: React.FC<any> = ({ active, payload }) => {
-  if (active && payload && payload.length) {
-    const data = payload[0].payload as AppTreemapNode; 
+const CustomTooltip: React.FC<any> = ({ active, payload: tooltipPayload }) => { // Renamed to avoid conflict
+  if (active && tooltipPayload && tooltipPayload.length) {
+    const data = tooltipPayload[0].payload as AppTreemapNode; 
+    // Ensure data and its properties are defined before accessing
+    if (!data || data.name === undefined || data.type === undefined || data.value === undefined) {
+        return null;
+    }
     return (
       <div className="bg-card p-3 border border-border shadow-lg rounded-md text-card-foreground">
         <p className="font-semibold">{data.name}</p>
@@ -179,4 +185,3 @@ const CustomTooltip: React.FC<any> = ({ active, payload }) => {
   }
   return null;
 };
-
