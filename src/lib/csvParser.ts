@@ -7,11 +7,13 @@ export function parseCSV(csvText: string): { headers: string[]; rows: Record<str
   const lines = csvText.trim().split(/\r\n|\n/); // Handle both CRLF and LF line endings
   if (lines.length === 0) return { headers: [], rows: [] };
 
-  // Basic CSV header parsing: split by comma, trim whitespace, remove surrounding quotes
-  // Assign a placeholder if a header is empty.
+  // Basic CSV header parsing: split by comma, trim whitespace, remove surrounding quotes.
+  // Assign a placeholder if a header is empty to prevent issues with Select components.
   const parseHeader = (headerLine: string) =>
     headerLine.split(',').map((h, index) => {
       const trimmedHeader = h.trim().replace(/^"|"$/g, '');
+      // If, after trimming and removing quotes, the header is an empty string,
+      // replace it with a placeholder. Otherwise, use the trimmed header.
       return trimmedHeader === '' ? `(Unnamed Column ${index + 1})` : trimmedHeader;
     });
 
