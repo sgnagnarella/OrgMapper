@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
@@ -9,7 +8,7 @@ import { Separator } from '@/components/ui/separator';
 import { FileUploadButton } from '@/components/FileUploadButton';
 import { ColumnSelector } from '@/components/ColumnSelector';
 import { FilterControls } from '@/components/FilterControls';
-import { OrgTreemapChartEcharts } from '@/components/OrgTreemapChartEcharts';
+import { OrgTreemapChartEcharts, OrgTreemapChartEchartsHandle } from '@/components/OrgTreemapChartEcharts';
 import { parseCSV } from '@/lib/csvParser';
 import { mapCsvColumns, MapCsvColumnsInput, MapCsvColumnsOutput } from '@/ai/flows/map-csv-columns';
 import { TARGET_FIELDS, TargetField, ColumnMappings, EmployeeData, TreemapNode, ActiveFilters, FilterOptions } from '@/types';
@@ -18,9 +17,9 @@ import { useToast } from "@/hooks/use-toast";
 
 const initialColumnMappings = TARGET_FIELDS.reduce((acc, field) => ({ ...acc, [field]: null }), {} as ColumnMappings);
 const initialActiveFilters: ActiveFilters = {
-  level: null,
-  employeeType: null,
-  teamProject: null,
+  level: [],
+  employeeType: [],
+  teamProject: [],
   clickedManager: null,
   clickedLocation: null,
 };
@@ -51,6 +50,8 @@ export default function OrgMapperPage() {
   const [error, setError] = useState<string | null>(null);
 
   const { toast } = useToast();
+
+  const treemapRef = React.useRef<OrgTreemapChartEchartsHandle>(null);
 
   const handleFileSelect = useCallback(async (selectedFile: File) => {
     setFile(selectedFile);
@@ -167,11 +168,11 @@ export default function OrgMapperPage() {
         newFilteredEmployees = newFilteredEmployees.filter(e => e.location === activeFilters.clickedLocation);
       }
     }
-    
-    if (activeFilters.level) newFilteredEmployees = newFilteredEmployees.filter(e => e.level === activeFilters.level);
-    if (activeFilters.employeeType) newFilteredEmployees = newFilteredEmployees.filter(e => e.employeeType === activeFilters.employeeType);
-    if (activeFilters.teamProject) newFilteredEmployees = newFilteredEmployees.filter(e => e.teamProject === activeFilters.teamProject);
-    
+    // Multi-select filter logic
+    if (activeFilters.level.length > 0) newFilteredEmployees = newFilteredEmployees.filter(e => activeFilters.level.includes(e.level));
+    if (activeFilters.employeeType.length > 0) newFilteredEmployees = newFilteredEmployees.filter(e => activeFilters.employeeType.includes(e.employeeType));
+    if (activeFilters.teamProject.length > 0) newFilteredEmployees = newFilteredEmployees.filter(e => activeFilters.teamProject.includes(e.teamProject));
+
     console.log("Filtered Employees:", newFilteredEmployees);
     setFilteredEmployees(newFilteredEmployees);
   }, [processedEmployees, activeFilters]);
@@ -204,44 +205,109 @@ export default function OrgMapperPage() {
     });
     console.log('Managers Map:', managersMap);
 
+    // Color palette for managers (extend as needed)
+    const managerColors = [
+      '#6699CC', // blue
+      '#E67300', // orange
+      '#8BC34A', // green
+      '#FFB300', // yellow
+      '#E57373', // red
+      '#BA68C8', // purple
+      '#4DD0E1', // teal
+      '#FFD54F', // gold
+      '#A1887F', // brown
+      '#90A4AE', // gray
+    ];
+    // Helper to generate HSL shade from hex
+    function hexToHsl(hex: string, lightness: number) {
+      let r = 0, g = 0, b = 0;
+      if (hex.length === 7) {
+        r = parseInt(hex.slice(1, 3), 16);
+        g = parseInt(hex.slice(3, 5), 16);
+        b = parseInt(hex.slice(5, 7), 16);
+      }
+      r /= 255; g /= 255; b /= 255;
+      const max = Math.max(r, g, b), min = Math.min(r, g, b);
+      let h = 0, s = 0, l = (max + min) / 2;
+      if (max !== min) {
+        const d = max - min;
+        s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+        switch (max) {
+          case r: h = (g - b) / d + (g < b ? 6 : 0); break;
+          case g: h = (b - r) / d + 2; break;
+          case b: h = (r - g) / d + 4; break;
+        }
+        h /= 6;
+      }
+      h = Math.round(h * 360);
+      s = Math.round(s * 100);
+      return `hsl(${h}, ${s}%, ${lightness}%)`;
+    }
 
     const newTreemapData: TreemapNode[] = [];
+    let managerIndex = 0;
     managersMap.forEach((locations, managerName) => {
+      const baseColor = managerColors[managerIndex % managerColors.length];
       const locationChildren: TreemapNode[] = [];
       let managerTotalEmployees = 0;
+      let locIndex = 0;
+      const totalLocs = locations.size;
       locations.forEach((count, locName) => {
+        // Generate a shade for each location
+        const lightness = 60 + Math.round((locIndex / Math.max(1, totalLocs - 1)) * 25); // 60% to 85%
         locationChildren.push({
           name: locName,
           value: count,
           type: 'location',
           path: `${managerName}/${locName}`,
+          itemStyle: { color: hexToHsl(baseColor, lightness) },
         });
         managerTotalEmployees += count;
+        locIndex++;
       });
-      console.log(`Manager: ${managerName}, Location Children:`, locationChildren, `Length: ${locationChildren.length}`);
-
-      // Only add manager if they have location children (which they will if they had reports,
-      // possibly under Unknown Location)
-      if (locationChildren.length > 0) { 
+      // Only add manager if they have location children
+      if (locationChildren.length > 0) {
+        // Find the manager's own location using the mapped username and location columns
+        let managerLocation = '';
+        const usernameCol = columnMappings['username'];
+        const locationCol = columnMappings['location'];
+        if (usernameCol && locationCol) {
+          const managerRow = processedEmployees.find(e => e.originalRow[usernameCol] === managerName);
+          if (managerRow) {
+            managerLocation = managerRow.originalRow[locationCol] || '';
+          }
+        }
         newTreemapData.push({
           name: managerName,
           children: locationChildren,
           type: 'manager',
           path: managerName,
-          value: managerTotalEmployees 
+          value: managerTotalEmployees,
+          itemStyle: { color: baseColor },
+          managerLocation,
         });
       }
+      managerIndex++;
     });
     setTreemapData(newTreemapData);
-  }, [filteredEmployees, processedEmployees]); 
+  }, [filteredEmployees, processedEmployees, columnMappings]); 
   
-  const handleFilterChange = useCallback((filterName: keyof Pick<ActiveFilters, 'level' | 'employeeType' | 'teamProject'>, value: string | null) => {
-    setActiveFilters(prev => ({ 
-        ...prev, 
-        [filterName]: value,
-        clickedManager: null, 
-        clickedLocation: null,
-    }));
+  const handleFilterChange = useCallback((filterName: keyof Pick<ActiveFilters, 'level' | 'employeeType' | 'teamProject'>, value: string) => {
+    setActiveFilters(prev => {
+      const prevArr = prev[filterName] as string[];
+      let newArr: string[];
+      if (prevArr.includes(value)) {
+        newArr = prevArr.filter(v => v !== value);
+      } else {
+        newArr = [...prevArr, value];
+      }
+      return {
+        ...prev,
+        [filterName]: newArr,
+        clickedManager: prev.clickedManager,
+        clickedLocation: prev.clickedLocation,
+      };
+    });
   }, []);
 
   const handleResetFilters = useCallback(() => {
@@ -292,7 +358,7 @@ export default function OrgMapperPage() {
             <ColumnSelector
               key={field}
               fieldId={`map-${field}`}
-              label={field.charAt(0).toUpperCase() + field.slice(1).replace(/([A-Z])/g, ' $1')} 
+              label={field.charAt(0).toUpperCase() + field.slice(1).replace(/([A-Z])/g, ' $1')}
               options={csvHeaders}
               selectedValue={columnMappings[field]}
               onChange={(value) => handleMappingChange(field, value)}
@@ -342,33 +408,49 @@ export default function OrgMapperPage() {
         </Alert>
       )}
 
-      <div className="flex flex-col lg:flex-row gap-6 h-full">
-        <div className={`relative space-y-6 transition-all duration-300 ease-in-out ${isLeftPanelCollapsed ? 'w-0 opacity-0 lg:w-12 lg:opacity-100' : 'w-full lg:w-1/3'}`}>
-          <Button
-            variant="outline"
-            size="icon"
-            className={`absolute top-0 ${isLeftPanelCollapsed ? '-right-12 lg:-right-12' : '-right-6 lg:-right-6'} z-10 transition-all duration-300 ease-in-out`}
-            onClick={() => setIsLeftPanelCollapsed(!isLeftPanelCollapsed)}
-            aria-label={isLeftPanelCollapsed ? 'Expand Controls' : 'Collapse Controls'}
-          >
-            {isLeftPanelCollapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
-          </Button>
-          {sections.map(section => section.show && (
-            <Card key={section.title} className={`shadow-md ${isLeftPanelCollapsed ? 'hidden lg:block' : ''}`}>
-              <CardHeader className="flex flex-row items-center space-x-2 space-y-0 pb-2">
-                <div className="flex items-center space-x-2">
-                   {section.icon}
-                   <CardTitle className="text-xl font-headline">{section.title}</CardTitle>
-                </div>
-              </CardHeader>
-              <CardContent>
-                {section.content}
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-        <div className={`flex-1 transition-all duration-300 ease-in-out ${isLeftPanelCollapsed ? 'w-full' : 'w-full lg:w-2/3'}`}>
-          <Card className="shadow-md h-[calc(100vh-12rem)] min-h-[400px] lg:h-full">
+      <div className="flex flex-col lg:flex-row gap-6 h-full min-h-0 flex-1">
+        {/* Left Panel: Only render content if not collapsed */}
+        {isLeftPanelCollapsed ? (
+          <div className="relative">
+            <Button
+              variant="outline"
+              size="icon"
+              className="absolute top-0 -right-6 z-10"
+              onClick={() => setIsLeftPanelCollapsed(false)}
+              aria-label="Expand Controls"
+            >
+              <ChevronRight className="h-4 w-4" />
+            </Button>
+          </div>
+        ) : (
+          <div className="relative space-y-6 transition-all duration-300 ease-in-out w-full lg:w-1/3 min-w-0">
+            <Button
+              variant="outline"
+              size="icon"
+              className="absolute top-0 -right-6 z-10"
+              onClick={() => setIsLeftPanelCollapsed(true)}
+              aria-label="Collapse Controls"
+            >
+              <ChevronLeft className="h-4 w-4" />
+            </Button>
+            {sections.map(section => section.show && (
+              <Card key={section.title} className="shadow-md">
+                <CardHeader className="flex flex-row items-center space-x-2 space-y-0 pb-2">
+                  <div className="flex items-center space-x-2">
+                    {section.icon}
+                    <CardTitle className="text-xl font-headline">{section.title}</CardTitle>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  {section.content}
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        )}
+        {/* Treemap Panel: Always take full width if left panel is collapsed */}
+        <div className={`flex-1 min-w-0 flex flex-col transition-all duration-300 ease-in-out ${isLeftPanelCollapsed ? 'w-full' : 'w-full lg:w-2/3'}`}>
+          <Card className="shadow-md h-[calc(100vh-1rem)] min-h-[400px] lg:h-full">
             <CardHeader>
               <CardTitle className="flex items-center text-xl font-headline">
                 <BarChart2 className="h-5 w-5 text-primary" />
@@ -381,13 +463,37 @@ export default function OrgMapperPage() {
               </CardDescription>
             </CardHeader>
             <CardContent className="h-[calc(100%-8rem)]">
+              {(activeFilters.clickedManager || activeFilters.clickedLocation) && (
+                <div className="mb-2 flex justify-center">
+                  <button
+                    className="px-4 py-1 rounded bg-muted text-primary font-medium hover:bg-primary/10 transition"
+                    onClick={() => setActiveFilters(prev => ({
+                      ...prev,
+                      clickedManager: null,
+                      clickedLocation: null,
+                    }))}
+                  >
+                    ← Back to Overview
+                  </button>
+                </div>
+              )}
+              <div className="mb-2 flex justify-end">
+                <Button size="sm" variant="outline" onClick={() => treemapRef.current?.exportAsPng()}>
+                  Export as PNG
+                </Button>
+              </div>
+              {activeFilters.clickedManager && (
+                <div className="mb-4 text-2xl font-bold text-center text-primary">
+                  Manager: {activeFilters.clickedManager}
+                </div>
+              )}
               {(isParsing || isProcessingData) && !treemapData.length ? (
                   <div className="flex flex-col items-center justify-center h-full">
                     <Loader2 className="h-12 w-12 animate-spin text-primary mb-4" />
                     <p className="text-muted-foreground">Loading data...</p>
                   </div>
               ) : processedEmployees.length > 0 ? (
-                <OrgTreemapChartEcharts data={treemapData} onNodeClick={handleNodeClick} />
+                <OrgTreemapChartEcharts ref={treemapRef} data={treemapData} onNodeClick={handleNodeClick} />
               ) : (
                 <div className="flex flex-col items-center justify-center h-full text-center">
                   <BarChart2 className="h-16 w-16 text-muted-foreground/50 mb-4" />

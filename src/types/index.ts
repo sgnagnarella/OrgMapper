@@ -1,4 +1,4 @@
-export const TARGET_FIELDS = ['manager', 'location', 'teamProject', 'employeeType', 'level'] as const;
+export const TARGET_FIELDS = ['manager', 'location', 'teamProject', 'employeeType', 'level', 'username'] as const;
 export type TargetField = typeof TARGET_FIELDS[number];
 
 export type ColumnMappings = Record<TargetField, string | null>;
@@ -10,6 +10,7 @@ export interface EmployeeData {
   teamProject: string;
   employeeType: string;
   level: string;
+  username: string;
   // Store original row data for potential future use or display
   originalRow: Record<string, string>;
 }
@@ -22,12 +23,14 @@ export interface TreemapNode {
   type: 'manager' | 'location';
   // Additional properties if needed for styling or tooltips
   color?: string;
+  itemStyle?: { color?: string };
+  managerLocation?: string;
 }
 
 export interface ActiveFilters {
-  level: string | null;
-  employeeType: string | null;
-  teamProject: string | null;
+  level: string[];
+  employeeType: string[];
+  teamProject: string[];
   // For node click filtering
   clickedManager: string | null;
   clickedLocation: string | null;

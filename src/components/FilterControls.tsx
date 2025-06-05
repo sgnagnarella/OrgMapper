@@ -1,4 +1,3 @@
-
 "use client";
 
 import React from 'react';
@@ -6,12 +5,14 @@ import type { ActiveFilters, FilterOptions } from '@/types';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
-import { Users, Briefcase, FolderKanban, RotateCcw, BarChart2 } from 'lucide-react';
+import { Users, Briefcase, FolderKanban, RotateCcw, BarChart2, ChevronDown } from 'lucide-react';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Checkbox } from '@/components/ui/checkbox';
 
 interface FilterControlsProps {
   options: FilterOptions;
   activeFilters: ActiveFilters;
-  onFilterChange: (filterName: keyof Pick<ActiveFilters, 'level' | 'employeeType' | 'teamProject'>, value: string | null) => void;
+  onFilterChange: (filterName: keyof Pick<ActiveFilters, 'level' | 'employeeType' | 'teamProject'>, value: string) => void;
   onResetFilters: () => void;
   disabled?: boolean;
 }
@@ -22,48 +23,62 @@ const filterConfig = [
   { id: 'teamProject' as const, label: 'Team/Project', icon: <FolderKanban className="h-4 w-4" /> },
 ] as const;
 
+const renderMultiSelect = (
+  id: keyof Pick<ActiveFilters, 'level' | 'employeeType' | 'teamProject'>,
+  label: string,
+  icon: React.ReactNode,
+  incomingFilterOptions: string[],
+  selected: string[],
+  onChange: (value: string) => void,
+  disabled: boolean
+) => (
+  <div key={id} className="space-y-1.5">
+    <Label htmlFor={`filter-${id}`} className="flex items-center text-sm font-medium">
+      {icon}
+      <span className="ml-2">{label}</span>
+    </Label>
+    <Popover>
+      <PopoverTrigger asChild>
+        <Button variant="outline" className="w-full justify-between" disabled={disabled}>
+          <span>
+            {selected.length === 0 ? `All ${label}s` : selected.join(', ')}
+          </span>
+          <ChevronDown className="h-4 w-4 ml-2 opacity-50" />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-56 p-2">
+        <div className="flex flex-col gap-1 max-h-60 overflow-y-auto">
+          {incomingFilterOptions.map((option, idx) => (
+            <label key={option} className="flex items-center gap-2 cursor-pointer px-2 py-1 rounded hover:bg-accent">
+              <Checkbox
+                checked={selected.includes(option)}
+                onCheckedChange={() => onChange(option)}
+                id={`checkbox-${id}-${option}`}
+                disabled={disabled}
+              />
+              <span className="text-sm">{option}</span>
+            </label>
+          ))}
+        </div>
+      </PopoverContent>
+    </Popover>
+  </div>
+);
 
 export function FilterControls({ options, activeFilters, onFilterChange, onResetFilters, disabled = false }: FilterControlsProps) {
-
-  const renderSelect = (
-    id: keyof Pick<ActiveFilters, 'level' | 'employeeType' | 'teamProject'>,
-    label: string,
-    icon: React.ReactNode,
-    incomingFilterOptions: string[]
-  ) => (
-    <div key={id} className="space-y-1.5">
-      <Label htmlFor={`filter-${id}`} className="flex items-center text-sm font-medium">
-        {icon}
-        <span className="ml-2">{label}</span>
-      </Label>
-      <Select
-        value={activeFilters[id] || ''}
-        onValueChange={(value) => onFilterChange(id, value === '' ? null : value)}
-        disabled={disabled || !incomingFilterOptions || incomingFilterOptions.length === 0}
-      >
-        <SelectTrigger id={`filter-${id}`} className="w-full">
-          <SelectValue placeholder={`All ${label}s`} />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectItem value="all">All {label}s</SelectItem>
-          {/* Ensure options are robustly filtered for non-empty strings before mapping */}
-          {(incomingFilterOptions || [])
-            .filter(option => typeof option === 'string' && option !== '') // Ensure it's a non-empty string
-            .map((option, index) => (
-              <SelectItem key={`${id}-${option}-${index}`} value={option}>
-                {option}
-              </SelectItem>
-            ))}
-        </SelectContent>
-      </Select>
-    </div>
-  );
-
   return (
     <div className="space-y-4">
       {filterConfig.map((fc) => {
          const currentOptions = options[fc.id === 'teamProject' ? 'teamProjects' : fc.id === 'employeeType' ? 'employeeTypes' : 'levels'];
-         return renderSelect(fc.id, fc.label, fc.icon, currentOptions || []);
+         return renderMultiSelect(
+           fc.id,
+           fc.label,
+           fc.icon,
+           currentOptions || [],
+           activeFilters[fc.id],
+           (value) => onFilterChange(fc.id, value),
+           disabled || !currentOptions || currentOptions.length === 0
+         );
       })}
       <Button onClick={onResetFilters} variant="outline" className="w-full" disabled={disabled}>
         <RotateCcw className="mr-2 h-4 w-4" /> Reset All Filters
