@@ -30,7 +30,7 @@ export function FilterControls({ options, activeFilters, onFilterChange, onReset
     id: keyof Pick<ActiveFilters, 'level' | 'employeeType' | 'teamProject'>,
     label: string,
     icon: React.ReactNode,
-    filterOptions: string[]
+    incomingFilterOptions: string[] // Renamed to avoid confusion in map
   ) => (
     <div key={id} className="space-y-1.5">
       <Label htmlFor={`filter-${id}`} className="flex items-center text-sm font-medium">
@@ -40,14 +40,15 @@ export function FilterControls({ options, activeFilters, onFilterChange, onReset
       <Select
         value={activeFilters[id] || ''}
         onValueChange={(value) => onFilterChange(id, value === '' ? null : value)}
-        disabled={disabled || filterOptions.length === 0}
+        disabled={disabled || incomingFilterOptions.length === 0}
       >
         <SelectTrigger id={`filter-${id}`} className="w-full">
           <SelectValue placeholder={`Filter by ${label.toLowerCase()}...`} />
         </SelectTrigger>
         <SelectContent>
           <SelectItem value="">All {label}s</SelectItem>
-          {filterOptions.map((option) => (
+          {/* Explicitly filter out empty strings before mapping */}
+          {incomingFilterOptions.filter(opt => opt !== '').map((option) => (
             <SelectItem key={option} value={option}>
               {option}
             </SelectItem>
@@ -68,3 +69,4 @@ export function FilterControls({ options, activeFilters, onFilterChange, onReset
     </div>
   );
 }
+
