@@ -42,6 +42,7 @@ interface CustomizedContentProps extends RechartsNodeProps {
 const CustomizedContent: React.FC<CustomizedContentProps> = ({
   depth, x, y, width, height, index, payload, name, value, onNodeClick, colorsInfo
 }) => {
+  console.log('CustomizedContent props:', { depth, x, y, width, height, index, payload, name, value });
   if (!payload || !name) { // Add guard for payload and name
     return null;
   }
@@ -94,12 +95,12 @@ const CustomizedContent: React.FC<CustomizedContentProps> = ({
       <rect
         x={x}
         y={y}
-        width={width}
-        height={height}
+        width={50}
+        height={50}
         style={{
-          fill: fillColor,
-          stroke: '#fff',
-          strokeWidth: 2 / (depth + 1e-10), 
+          fill: 'blue',
+          stroke: 'black',
+          strokeWidth: 1,
           strokeOpacity: 1 / (depth + 1e-10),
           cursor: 'pointer',
         }}
@@ -130,6 +131,7 @@ const CustomizedContent: React.FC<CustomizedContentProps> = ({
           ({value})
         </text>
       )}
+      console.log('Finished rendering group for:', name);
     </g>
   );
 };
@@ -140,6 +142,7 @@ interface OrgTreemapChartProps {
 }
 
 export function OrgTreemapChart({ data, onNodeClick }: OrgTreemapChartProps) {
+  console.log('OrgTreemapChart received data:', data);
   if (!data || data.length === 0) {
     return <div className="flex items-center justify-center h-full text-muted-foreground">No data to display. Try adjusting filters or uploading a new CSV.</div>;
   }
@@ -153,12 +156,7 @@ export function OrgTreemapChart({ data, onNodeClick }: OrgTreemapChartProps) {
       <Treemap
         data={data}
         dataKey="value" 
-        ratio={4 / 3}    
-        stroke="#fff"    
         content={contentRenderer}
-        isAnimationActive={true}
-        animationDuration={500}
-        animationEasing="ease-in-out"
       >
         <Tooltip content={<CustomTooltip />} />
       </Treemap>

@@ -9,11 +9,11 @@ import { Separator } from '@/components/ui/separator';
 import { FileUploadButton } from '@/components/FileUploadButton';
 import { ColumnSelector } from '@/components/ColumnSelector';
 import { FilterControls } from '@/components/FilterControls';
-import { OrgTreemapChart } from '@/components/OrgTreemapChart';
+import { OrgTreemapChartEcharts } from '@/components/OrgTreemapChartEcharts';
 import { parseCSV } from '@/lib/csvParser';
 import { mapCsvColumns, MapCsvColumnsInput, MapCsvColumnsOutput } from '@/ai/flows/map-csv-columns';
 import { TARGET_FIELDS, TargetField, ColumnMappings, EmployeeData, TreemapNode, ActiveFilters, FilterOptions } from '@/types';
-import { Loader2, AlertTriangle, CheckCircle, Settings2, Filter as FilterIcon, BarChart2, UploadCloud } from 'lucide-react';
+import { Loader2, AlertTriangle, CheckCircle, Settings2, Filter as FilterIcon, BarChart2, UploadCloud, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
 
 const initialColumnMappings = TARGET_FIELDS.reduce((acc, field) => ({ ...acc, [field]: null }), {} as ColumnMappings);
@@ -32,6 +32,7 @@ const createUniqueSortedOptions = (values: (string | undefined | null)[]): strin
 export default function OrgMapperPage() {
   const [file, setFile] = useState<File | null>(null);
   const [csvHeaders, setCsvHeaders] = useState<string[]>([]);
+  const [isLeftPanelCollapsed, setIsLeftPanelCollapsed] = useState(false);
   const [csvRows, setCsvRows] = useState<Record<string, string>[]>([]);
   
   const [columnMappings, setColumnMappings] = useState<ColumnMappings>(initialColumnMappings);
@@ -101,6 +102,7 @@ export default function OrgMapperPage() {
         }
       });
       setColumnMappings(newMappings);
+      console.log("AI Mapped Column Mappings:", newMappings);
       toast({ title: "AI Column Mapping", description: `AI suggested mappings for ${mappedCount} fields.` });
     } catch (e: any) {
       setError(`AI mapping error: ${e.message}`);
@@ -135,6 +137,7 @@ export default function OrgMapperPage() {
       });
 
       setProcessedEmployees(mappedEmployees);
+      console.log("Processed Employees:", mappedEmployees);
 
       const levels = createUniqueSortedOptions(mappedEmployees.map(e => e.level));
       const employeeTypes = createUniqueSortedOptions(mappedEmployees.map(e => e.employeeType));
@@ -155,6 +158,7 @@ export default function OrgMapperPage() {
   }, [columnMappings]);
 
   useEffect(() => {
+    console.log("Filtering employees. Active filters:", activeFilters);
     let newFilteredEmployees = processedEmployees;
 
     if (activeFilters.clickedManager) {
@@ -168,6 +172,7 @@ export default function OrgMapperPage() {
     if (activeFilters.employeeType) newFilteredEmployees = newFilteredEmployees.filter(e => e.employeeType === activeFilters.employeeType);
     if (activeFilters.teamProject) newFilteredEmployees = newFilteredEmployees.filter(e => e.teamProject === activeFilters.teamProject);
     
+    console.log("Filtered Employees:", newFilteredEmployees);
     setFilteredEmployees(newFilteredEmployees);
   }, [processedEmployees, activeFilters]);
 
@@ -181,6 +186,7 @@ export default function OrgMapperPage() {
     const managersMap = new Map<string, Map<string, number>>(); 
 
     filteredEmployees.forEach(emp => {
+      console.log(`Employee: ${emp.id}, Manager: ${emp.manager}`);
       const managerName = emp.manager?.trim();
       // If location is empty or whitespace, use a placeholder. Manager must exist.
       const locationName = emp.location?.trim() || '(Unknown Location)'; 
@@ -196,6 +202,8 @@ export default function OrgMapperPage() {
       managerLocations.set(locationName, currentLocationCount + 1);
       managersMap.set(managerName, managerLocations);
     });
+    console.log('Managers Map:', managersMap);
+
 
     const newTreemapData: TreemapNode[] = [];
     managersMap.forEach((locations, managerName) => {
@@ -210,7 +218,8 @@ export default function OrgMapperPage() {
         });
         managerTotalEmployees += count;
       });
-      
+      console.log(`Manager: ${managerName}, Location Children:`, locationChildren, `Length: ${locationChildren.length}`);
+
       // Only add manager if they have location children (which they will if they had reports,
       // possibly under Unknown Location)
       if (locationChildren.length > 0) { 
@@ -333,16 +342,24 @@ export default function OrgMapperPage() {
         </Alert>
       )}
 
-      <div className="flex flex-col lg:flex-row gap-6">
-        <div className="lg:w-1/3 space-y-6">
+      <div className="flex flex-col lg:flex-row gap-6 h-full">
+        <div className={`relative space-y-6 transition-all duration-300 ease-in-out ${isLeftPanelCollapsed ? 'w-0 opacity-0 lg:w-12 lg:opacity-100' : 'w-full lg:w-1/3'}`}>
+          <Button
+            variant="outline"
+            size="icon"
+            className={`absolute top-0 ${isLeftPanelCollapsed ? '-right-12 lg:-right-12' : '-right-6 lg:-right-6'} z-10 transition-all duration-300 ease-in-out`}
+            onClick={() => setIsLeftPanelCollapsed(!isLeftPanelCollapsed)}
+            aria-label={isLeftPanelCollapsed ? 'Expand Controls' : 'Collapse Controls'}
+          >
+            {isLeftPanelCollapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
+          </Button>
           {sections.map(section => section.show && (
-            <Card key={section.title} className="shadow-md">
-              <CardHeader>
-                <CardTitle className="flex items-center text-xl font-headline">
-                  {section.icon}
-                  <span className="ml-2">{section.title}</span>
-                  {section.title === "2. Map Columns" && isMappingAi && <Loader2 className="ml-auto h-5 w-5 animate-spin text-primary" />}
-                </CardTitle>
+            <Card key={section.title} className={`shadow-md ${isLeftPanelCollapsed ? 'hidden lg:block' : ''}`}>
+              <CardHeader className="flex flex-row items-center space-x-2 space-y-0 pb-2">
+                <div className="flex items-center space-x-2">
+                   {section.icon}
+                   <CardTitle className="text-xl font-headline">{section.title}</CardTitle>
+                </div>
               </CardHeader>
               <CardContent>
                 {section.content}
@@ -350,8 +367,7 @@ export default function OrgMapperPage() {
             </Card>
           ))}
         </div>
-
-        <div className="lg:w-2/3">
+        <div className={`flex-1 transition-all duration-300 ease-in-out ${isLeftPanelCollapsed ? 'w-full' : 'w-full lg:w-2/3'}`}>
           <Card className="shadow-md h-[calc(100vh-12rem)] min-h-[400px] lg:h-full">
             <CardHeader>
               <CardTitle className="flex items-center text-xl font-headline">
@@ -371,7 +387,7 @@ export default function OrgMapperPage() {
                     <p className="text-muted-foreground">Loading data...</p>
                   </div>
               ) : processedEmployees.length > 0 ? (
-                <OrgTreemapChart data={treemapData} onNodeClick={handleNodeClick} />
+                <OrgTreemapChartEcharts data={treemapData} onNodeClick={handleNodeClick} />
               ) : (
                 <div className="flex flex-col items-center justify-center h-full text-center">
                   <BarChart2 className="h-16 w-16 text-muted-foreground/50 mb-4" />
@@ -385,6 +401,7 @@ export default function OrgMapperPage() {
           </Card>
         </div>
       </div>
+
     </div>
   );
 }
