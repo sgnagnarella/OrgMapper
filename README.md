@@ -85,6 +85,36 @@ GOOGLE_API_KEY=your_key_here
 
 ---
 
+## Project Structure & Main Components
+
+```
+src/
+├── ai/           # AI/Genkit integration and flows
+├── app/          # Next.js app entry, layout, and routing
+├── components/   # Main React components
+│   ├── OrgMapperPage.tsx         # Main page logic and state
+│   ├── OrgTreemapChartEcharts.tsx# ECharts-based treemap visualization
+│   ├── FilterControls.tsx        # Filtering UI (multi-selects, switches)
+│   ├── ColumnSelector.tsx        # Column mapping dropdowns
+│   ├── FileUploadButton.tsx      # CSV upload button
+│   └── ui/                       # Reusable UI primitives (Button, Card, Select, Switch, etc.)
+├── hooks/        # Custom React hooks (e.g., use-toast)
+├── lib/          # Utility functions (e.g., csvParser)
+├── types/        # TypeScript type definitions (EmployeeData, TreemapNode, etc.)
+```
+
+### Main Components
+- **OrgMapperPage.tsx**: Main page, handles file upload, mapping, filtering, and state.
+- **OrgTreemapChartEcharts.tsx**: Renders the interactive treemap using ECharts.
+- **FilterControls.tsx**: UI for all filters (multi-select, switches).
+- **ColumnSelector.tsx**: Dropdown for mapping CSV columns to required fields.
+- **FileUploadButton.tsx**: Handles CSV file upload.
+- **ui/**: Contains all reusable UI primitives (Button, Card, Select, Switch, etc.).
+- **lib/csvParser.ts**: Parses CSV files into usable data.
+- **types/index.ts**: Central location for all TypeScript types used in the app.
+
+---
+
 ## License
 
 MIT
