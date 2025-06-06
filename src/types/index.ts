@@ -34,6 +34,8 @@ export interface ActiveFilters {
   // For node click filtering
   clickedManager: string | null;
   clickedLocation: string | null;
+  differentCampusOnly?: boolean;
+  showEmployeeCount?: boolean;
 }
 
 export interface FilterOptions {

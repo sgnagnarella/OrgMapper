@@ -13,15 +13,18 @@ echarts.use([TooltipComponent]);
 interface OrgTreemapChartEchartsProps {
   data: TreemapNode[];
   onNodeClick: (node: TreemapNode) => void;
+  showEmployeeCount?: boolean;
 }
 
 export interface OrgTreemapChartEchartsHandle {
   exportAsPng: () => void;
+  exportAsHtml: () => void;
 }
 
-export const OrgTreemapChartEcharts = forwardRef<OrgTreemapChartEchartsHandle, OrgTreemapChartEchartsProps>(({ data, onNodeClick }, ref) => {
+export const OrgTreemapChartEcharts = forwardRef<OrgTreemapChartEchartsHandle, OrgTreemapChartEchartsProps>(({ data, onNodeClick, showEmployeeCount = false }, ref) => {
   const chartRef = useRef<HTMLDivElement>(null);
   const chartInstanceRef = useRef<echarts.ECharts | null>(null);
+  const lastOptionRef = useRef<EChartsCoreOption | null>(null);
 
   useImperativeHandle(ref, () => ({
     exportAsPng: () => {
@@ -32,6 +35,31 @@ export const OrgTreemapChartEcharts = forwardRef<OrgTreemapChartEchartsHandle, O
         link.download = 'treemap.png';
         link.click();
       }
+    },
+    exportAsHtml: () => {
+      if (!lastOptionRef.current) return;
+      const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>OrgMapper Treemap Export</title>
+  <script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js"></script>
+  <style>body { margin: 0; } #main { width: 100vw; height: 100vh; }</style>
+</head>
+<body>
+  <div id="main"></div>
+  <script>
+    var chart = echarts.init(document.getElementById('main'));
+    var option = ${JSON.stringify(lastOptionRef.current)};
+    chart.setOption(option);
+  </script>
+</body>
+</html>`;
+      const blob = new Blob([html], { type: 'text/html' });
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(blob);
+      link.download = 'treemap.html';
+      link.click();
     }
   }), []);
 
@@ -66,6 +94,9 @@ export const OrgTreemapChartEcharts = forwardRef<OrgTreemapChartEchartsHandle, O
               formatter: function(params: any) {
                 if (params.data.type === 'manager' && params.data.managerLocation) {
                   return `${params.data.name} (${params.data.managerLocation})`;
+                }
+                if (showEmployeeCount && params.data.type === 'location' && typeof params.data.value === 'number') {
+                  return `${params.data.name} (${params.data.value})`;
                 }
                 return params.data.name;
               },
@@ -105,6 +136,7 @@ export const OrgTreemapChartEcharts = forwardRef<OrgTreemapChartEchartsHandle, O
       console.log(option);
 
       chartInstance.setOption(option);
+      lastOptionRef.current = option;
 
       // Add resize listener
       const handleResize = () => { chartInstance?.resize(); };
@@ -142,7 +174,7 @@ export const OrgTreemapChartEcharts = forwardRef<OrgTreemapChartEchartsHandle, O
       };
     }
     return () => {}; // Return empty cleanup if ref is null
-  }, [data, onNodeClick]); // Depend on data and onNodeClick. Removed chartInstance from dependencies as it's managed internally
+  }, [data, onNodeClick, showEmployeeCount]); // Depend on data and onNodeClick. Removed chartInstance from dependencies as it's managed internally
   
   return <div ref={chartRef} style={{ width: '100%', height: '100%' }}></div>;
 });

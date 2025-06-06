@@ -22,6 +22,8 @@ const initialActiveFilters: ActiveFilters = {
   teamProject: [],
   clickedManager: null,
   clickedLocation: null,
+  differentCampusOnly: false,
+  showEmployeeCount: false,
 };
 
 const createUniqueSortedOptions = (values: (string | undefined | null)[]): string[] => {
@@ -131,8 +133,11 @@ export default function OrgMapperPage() {
       const mappedEmployees = csvRows.map((row, index) => {
         const employee: Partial<EmployeeData> & { originalRow: Record<string, string> } = { id: String(index), originalRow: row };
         TARGET_FIELDS.forEach(field => {
-          const mappedHeader = columnMappings[field];
-          employee[field] = mappedHeader ? row[mappedHeader] || '' : '';
+          const mappedHeader = columnMappings[field as TargetField];
+          // Only set the field if mapped, or if not teamProject (which is optional)
+          if (mappedHeader || field !== 'teamProject') {
+            employee[field] = mappedHeader ? row[mappedHeader] || '' : '';
+          }
         });
         return employee as EmployeeData;
       });
@@ -171,11 +176,25 @@ export default function OrgMapperPage() {
     // Multi-select filter logic
     if (activeFilters.level.length > 0) newFilteredEmployees = newFilteredEmployees.filter(e => activeFilters.level.includes(e.level));
     if (activeFilters.employeeType.length > 0) newFilteredEmployees = newFilteredEmployees.filter(e => activeFilters.employeeType.includes(e.employeeType));
-    if (activeFilters.teamProject.length > 0) newFilteredEmployees = newFilteredEmployees.filter(e => activeFilters.teamProject.includes(e.teamProject));
+    if (activeFilters.teamProject.length > 0 && columnMappings.teamProject) newFilteredEmployees = newFilteredEmployees.filter(e => activeFilters.teamProject.includes(e.teamProject));
+
+    // Employees campus ≠ Manager campus filter
+    if (activeFilters.differentCampusOnly) {
+      const usernameCol = columnMappings['username'];
+      const locationCol = columnMappings['location'];
+      if (usernameCol && locationCol) {
+        newFilteredEmployees = newFilteredEmployees.filter(emp => {
+          const managerRow = processedEmployees.find(e => e.originalRow[usernameCol] === emp.manager);
+          if (!managerRow) return true; // If no manager row, keep
+          const managerLoc = managerRow.originalRow[locationCol];
+          return emp.location !== managerLoc;
+        });
+      }
+    }
 
     console.log("Filtered Employees:", newFilteredEmployees);
     setFilteredEmployees(newFilteredEmployees);
-  }, [processedEmployees, activeFilters]);
+  }, [processedEmployees, activeFilters, columnMappings]);
 
   useEffect(() => {
     if (filteredEmployees.length === 0 && processedEmployees.length > 0) { 
@@ -340,6 +359,23 @@ export default function OrgMapperPage() {
     }
   }, [toast]);
 
+  // For mapping UI: fixed order for mapping fields
+  const mappingOrder: TargetField[] = [
+    'username',
+    'manager',
+    'location',
+    'level',
+    'employeeType',
+    'teamProject',
+  ];
+  const requiredFields: TargetField[] = [
+    'username',
+    'manager',
+    'location',
+    'level',
+    'employeeType',
+  ];
+
   const sections = [
     { 
       title: "1. Upload CSV", 
@@ -354,23 +390,26 @@ export default function OrgMapperPage() {
       icon: <Settings2 className="h-5 w-5" />,
       content: (
         <div className="space-y-4">
-          {TARGET_FIELDS.map(field => (
+          <div className="text-xs text-muted-foreground mb-2">
+            <span className="text-red-500">*</span> Required fields. Team/Project is optional.
+          </div>
+          {mappingOrder.map(field => (
             <ColumnSelector
               key={field}
               fieldId={`map-${field}`}
-              label={field.charAt(0).toUpperCase() + field.slice(1).replace(/([A-Z])/g, ' $1')}
-              options={csvHeaders}
+              label={<span>{field.charAt(0).toUpperCase() + field.slice(1).replace(/([A-Z])/g, ' $1')}{requiredFields.includes(field) ? <span className="text-red-500 ml-1">*</span> : <span className="text-xs text-muted-foreground ml-1">(optional)</span>}</span>}
+              options={[...csvHeaders].sort((a, b) => a.localeCompare(b))}
               selectedValue={columnMappings[field]}
               onChange={(value) => handleMappingChange(field, value)}
               disabled={isMappingAi || csvHeaders.length === 0}
             />
           ))}
-          <Button onClick={applyMappingsAndProcessData} disabled={isProcessingData || !isMappingComplete || csvRows.length === 0} className="w-full">
+          <Button onClick={applyMappingsAndProcessData} disabled={isProcessingData || !requiredFields.every(f => columnMappings[f]) || csvRows.length === 0} className="w-full">
             {isProcessingData ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <CheckCircle className="mr-2 h-4 w-4" />}
             Apply Mappings & Process Data
           </Button>
-          {!isMappingComplete && csvHeaders.length > 0 && (
-            <p className="text-xs text-muted-foreground text-center">Map all fields to proceed.</p>
+          {!requiredFields.every(f => columnMappings[f]) && csvHeaders.length > 0 && (
+            <p className="text-xs text-red-500 text-center">Map all required fields to proceed.</p>
           )}
         </div>
       ),
@@ -385,6 +424,8 @@ export default function OrgMapperPage() {
           activeFilters={activeFilters} 
           onFilterChange={handleFilterChange}
           onResetFilters={handleResetFilters}
+          onToggleDifferentCampusOnly={(value) => setActiveFilters(prev => ({ ...prev, differentCampusOnly: value }))}
+          onToggleShowEmployeeCount={(value) => setActiveFilters(prev => ({ ...prev, showEmployeeCount: value }))}
           disabled={processedEmployees.length === 0}
         />
       ),
@@ -477,9 +518,12 @@ export default function OrgMapperPage() {
                   </button>
                 </div>
               )}
-              <div className="mb-2 flex justify-end">
+              <div className="mb-2 flex justify-end gap-2">
                 <Button size="sm" variant="outline" onClick={() => treemapRef.current?.exportAsPng()}>
                   Export as PNG
+                </Button>
+                <Button size="sm" variant="outline" onClick={() => treemapRef.current?.exportAsHtml()}>
+                  Export as HTML
                 </Button>
               </div>
               {activeFilters.clickedManager && (
@@ -493,7 +537,7 @@ export default function OrgMapperPage() {
                     <p className="text-muted-foreground">Loading data...</p>
                   </div>
               ) : processedEmployees.length > 0 ? (
-                <OrgTreemapChartEcharts ref={treemapRef} data={treemapData} onNodeClick={handleNodeClick} />
+                <OrgTreemapChartEcharts ref={treemapRef} data={treemapData} onNodeClick={handleNodeClick} showEmployeeCount={!!activeFilters.showEmployeeCount} />
               ) : (
                 <div className="flex flex-col items-center justify-center h-full text-center">
                   <BarChart2 className="h-16 w-16 text-muted-foreground/50 mb-4" />

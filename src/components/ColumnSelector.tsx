@@ -1,4 +1,3 @@
-
 "use client";
 
 import React from 'react';
@@ -7,7 +6,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 
 interface ColumnSelectorProps {
   fieldId: string;
-  label: string;
+  label: React.ReactNode;
   options: string[]; // CSV headers
   selectedValue: string | null;
   onChange: (value: string | null) => void;

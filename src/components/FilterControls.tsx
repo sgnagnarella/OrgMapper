@@ -8,12 +8,15 @@ import { Button } from '@/components/ui/button';
 import { Users, Briefcase, FolderKanban, RotateCcw, BarChart2, ChevronDown } from 'lucide-react';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Switch } from '@/components/ui/switch';
 
 interface FilterControlsProps {
   options: FilterOptions;
   activeFilters: ActiveFilters;
   onFilterChange: (filterName: keyof Pick<ActiveFilters, 'level' | 'employeeType' | 'teamProject'>, value: string) => void;
   onResetFilters: () => void;
+  onToggleDifferentCampusOnly: (value: boolean) => void;
+  onToggleShowEmployeeCount: (value: boolean) => void;
   disabled?: boolean;
 }
 
@@ -65,7 +68,7 @@ const renderMultiSelect = (
   </div>
 );
 
-export function FilterControls({ options, activeFilters, onFilterChange, onResetFilters, disabled = false }: FilterControlsProps) {
+export function FilterControls({ options, activeFilters, onFilterChange, onResetFilters, onToggleDifferentCampusOnly, onToggleShowEmployeeCount, disabled = false }: FilterControlsProps) {
   return (
     <div className="space-y-4">
       {filterConfig.map((fc) => {
@@ -80,6 +83,28 @@ export function FilterControls({ options, activeFilters, onFilterChange, onReset
            disabled || !currentOptions || currentOptions.length === 0
          );
       })}
+      <div className="flex items-center gap-2">
+        <Switch
+          id="different-campus-switch"
+          checked={!!activeFilters.differentCampusOnly}
+          onCheckedChange={onToggleDifferentCampusOnly}
+          disabled={disabled}
+        />
+        <label htmlFor="different-campus-switch" className="text-sm select-none cursor-pointer">
+          Employees campus ≠ Manager campus
+        </label>
+      </div>
+      <div className="flex items-center gap-2">
+        <Switch
+          id="show-employee-count-switch"
+          checked={!!activeFilters.showEmployeeCount}
+          onCheckedChange={onToggleShowEmployeeCount}
+          disabled={disabled}
+        />
+        <label htmlFor="show-employee-count-switch" className="text-sm select-none cursor-pointer">
+          Show employee count in location boxes
+        </label>
+      </div>
       <Button onClick={onResetFilters} variant="outline" className="w-full" disabled={disabled}>
         <RotateCcw className="mr-2 h-4 w-4" /> Reset All Filters
       </Button>
